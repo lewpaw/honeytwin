@@ -25,7 +25,7 @@ def test_generate_creates_twin_config_from_stored_profile(tmp_path: Path):
     profile_path = save_profile(profile, tmp_path)
     settings = GlobalConfig(data_dir=tmp_path)
 
-    with patch("honeytwin.cli.commands.generate.load_global_config", return_value=settings):
+    with patch("honeytwin.cli.commands.generate.load_settings", return_value=settings):
         result = runner.invoke(
             app, ["generate", "--name", "web-01", "--profile", str(profile_path)]
         )
@@ -41,7 +41,7 @@ def test_generate_reports_missing_profile_file(tmp_path: Path):
     settings = GlobalConfig(data_dir=tmp_path)
     missing = tmp_path / "does-not-exist.json"
 
-    with patch("honeytwin.cli.commands.generate.load_global_config", return_value=settings):
+    with patch("honeytwin.cli.commands.generate.load_settings", return_value=settings):
         result = runner.invoke(app, ["generate", "--name", "web-01", "--profile", str(missing)])
 
     assert result.exit_code != 0

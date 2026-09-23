@@ -33,7 +33,7 @@ def test_scan_rejects_both_target_and_import(tmp_path: Path):
 def test_scan_live_target_prints_warning_before_nmap(tmp_path: Path):
     with (
         patch(
-            "honeytwin.cli.commands.scan.load_global_config",
+            "honeytwin.cli.commands.scan.load_settings",
             return_value=_config_for(tmp_path),
         ),
         patch("honeytwin.cli.commands.scan.run_nmap", return_value=FIXTURE_XML) as mock_run_nmap,
@@ -58,7 +58,7 @@ def test_scan_forwards_progress_lines_before_final_message(tmp_path: Path):
 
     with (
         patch(
-            "honeytwin.cli.commands.scan.load_global_config",
+            "honeytwin.cli.commands.scan.load_settings",
             return_value=_config_for(tmp_path),
         ),
         patch("honeytwin.cli.commands.scan.run_nmap", side_effect=_fake_run_nmap),
@@ -78,7 +78,7 @@ def test_scan_import_path_prints_warning_and_skips_nmap(tmp_path: Path):
 
     with (
         patch(
-            "honeytwin.cli.commands.scan.load_global_config",
+            "honeytwin.cli.commands.scan.load_settings",
             return_value=_config_for(tmp_path),
         ),
         patch("honeytwin.cli.commands.scan.run_nmap") as mock_run_nmap,
@@ -96,7 +96,7 @@ def test_scan_reports_nmap_scan_error(tmp_path: Path):
 
     with (
         patch(
-            "honeytwin.cli.commands.scan.load_global_config",
+            "honeytwin.cli.commands.scan.load_settings",
             return_value=_config_for(tmp_path),
         ),
         patch(

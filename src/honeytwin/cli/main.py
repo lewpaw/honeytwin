@@ -10,16 +10,35 @@ signature, satisfying the discoverability requirement regardless.
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Annotated
+
 import typer
 
 from honeytwin.cli.commands import containment, generate, run, scan, stop
 from honeytwin.cli.commands import list as list_command
+from honeytwin.cli.commands._common import set_config_path
 
 app = typer.Typer(
     name="honeytwin",
     help="nmap-scan-driven honeypot twin generator.",
     no_args_is_help=True,
 )
+
+CONFIG_OPTION = typer.Option(
+    "--config",
+    help=(
+        "Path to a HoneyTwin config file, used instead of the one discovered "
+        "at $XDG_CONFIG_HOME/honeytwin/config.yaml (or ~/.config/honeytwin/config.yaml)."
+    ),
+)
+
+
+@app.callback()
+def main(config: Annotated[Path | None, CONFIG_OPTION] = None) -> None:
+    """nmap-scan-driven honeypot twin generator."""
+    set_config_path(config)
+
 
 app.command(name="scan", help="Scan a target with nmap and produce a twin profile.")(scan.scan)
 app.command(

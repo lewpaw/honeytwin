@@ -8,12 +8,11 @@ from typing import Annotated
 
 import typer
 
-from honeytwin.cli.commands._common import TWIN_NAME_OPTION
+from honeytwin.cli.commands._common import TWIN_NAME_OPTION, load_settings
 from honeytwin.cli.commands._warnings import (
     print_internet_exposure_warning,
     print_outbound_access_warning,
 )
-from honeytwin.config.loader import load_global_config
 from honeytwin.config.schema import DockerNetworkMode, ExposureScope
 from honeytwin.containment.marker import ContainmentState, evaluate
 from honeytwin.docker.client import (
@@ -133,7 +132,7 @@ def run(name: Annotated[str, TWIN_NAME_OPTION]) -> None:
     """Run a generated twin as a Docker container."""
     _refuse_if_root()
 
-    settings = load_global_config()
+    settings = load_settings("run")
 
     try:
         twin_config = load_twin_config(name, settings.data_dir)

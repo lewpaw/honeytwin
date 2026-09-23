@@ -10,8 +10,8 @@ from typing import Annotated
 
 import typer
 
+from honeytwin.cli.commands._common import load_settings
 from honeytwin.cli.commands._warnings import print_authorization_warning
-from honeytwin.config.loader import load_global_config
 from honeytwin.profile.schema import ScanProfileName
 from honeytwin.profile.store import save_profile, save_raw_xml
 from honeytwin.scan.import_ import import_xml_file
@@ -49,7 +49,7 @@ def scan(
 
     print_authorization_warning()
 
-    config = load_global_config()
+    config = load_settings("scan")
 
     try:
         if import_path is not None:

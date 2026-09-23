@@ -21,6 +21,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/honeytwin"]
+# The shipped defaults and nmap profiles are read via importlib.resources,
+# so they must travel inside the package, not beside it.
+artifacts = ["src/honeytwin/data/*.yaml"]
 
 [dependency-groups]
 dev = [

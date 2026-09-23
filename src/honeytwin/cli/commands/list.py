@@ -13,8 +13,7 @@ from typing import Annotated
 
 import typer
 
-from honeytwin.cli.commands._common import TWIN_NAME_OPTION
-from honeytwin.config.loader import load_global_config
+from honeytwin.cli.commands._common import TWIN_NAME_OPTION, load_settings
 from honeytwin.docker.client import (
     DockerUnavailableError,
     get_client,
@@ -28,7 +27,7 @@ NOT_RUNNING_STATUS = "not running"
 
 def list_twins(name: Annotated[str | None, TWIN_NAME_OPTION] = None) -> None:
     """List twins on this host, optionally filtered by name."""
-    settings = load_global_config()
+    settings = load_settings("list")
 
     names = list_twin_names(settings.data_dir)
     if name is not None:

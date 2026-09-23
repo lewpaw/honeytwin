@@ -22,7 +22,7 @@ def test_setup_installs_rules_and_records_the_marker(tmp_path: Path, monkeypatch
 
     with (
         patch(
-            "honeytwin.cli.commands.containment.load_global_config",
+            "honeytwin.cli.commands.containment.load_settings",
             return_value=_settings(tmp_path),
         ),
         patch(
@@ -48,7 +48,7 @@ def test_setup_reports_when_rules_were_already_in_place(tmp_path: Path, monkeypa
 
     with (
         patch(
-            "honeytwin.cli.commands.containment.load_global_config",
+            "honeytwin.cli.commands.containment.load_settings",
             return_value=_settings(tmp_path),
         ),
         patch("honeytwin.cli.commands.containment.install_rules", return_value=[]),
@@ -79,7 +79,7 @@ def test_setup_reports_a_firewall_failure_without_writing_a_marker(tmp_path: Pat
 
     with (
         patch(
-            "honeytwin.cli.commands.containment.load_global_config",
+            "honeytwin.cli.commands.containment.load_settings",
             return_value=_settings(tmp_path),
         ),
         patch(
@@ -100,7 +100,7 @@ def test_status_reports_active(tmp_path: Path):
 
         with (
             patch(
-                "honeytwin.cli.commands.containment.load_global_config",
+                "honeytwin.cli.commands.containment.load_settings",
                 return_value=_settings(tmp_path),
             ),
             patch("honeytwin.cli.commands.containment.rules_installed", return_value=True),
@@ -119,7 +119,7 @@ def test_status_reports_stale_after_a_reboot(tmp_path: Path):
     with (
         patch("honeytwin.containment.marker.read_boot_id", return_value="boot-bbb"),
         patch(
-            "honeytwin.cli.commands.containment.load_global_config",
+            "honeytwin.cli.commands.containment.load_settings",
             return_value=_settings(tmp_path),
         ),
         patch("honeytwin.cli.commands.containment.rules_installed", return_value=False),
@@ -134,7 +134,7 @@ def test_status_reports_stale_after_a_reboot(tmp_path: Path):
 def test_status_reports_missing(tmp_path: Path):
     with (
         patch(
-            "honeytwin.cli.commands.containment.load_global_config",
+            "honeytwin.cli.commands.containment.load_settings",
             return_value=_settings(tmp_path),
         ),
         patch("honeytwin.cli.commands.containment.rules_installed", return_value=False),
@@ -151,7 +151,7 @@ def test_status_says_so_when_it_cannot_read_the_live_rules(tmp_path: Path):
 
         with (
             patch(
-                "honeytwin.cli.commands.containment.load_global_config",
+                "honeytwin.cli.commands.containment.load_settings",
                 return_value=_settings(tmp_path),
             ),
             patch(

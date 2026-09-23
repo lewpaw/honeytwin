@@ -14,7 +14,7 @@ import os
 
 import typer
 
-from honeytwin.config.loader import load_global_config
+from honeytwin.cli.commands._common import load_settings
 from honeytwin.containment.firewall import FirewallError, install_rules, rules_installed
 from honeytwin.containment.marker import ContainmentState, evaluate, write_marker
 
@@ -42,7 +42,7 @@ def containment_setup() -> None:
     """Install the host egress restriction for HoneyTwin's twin network."""
     _require_root()
 
-    settings = load_global_config()
+    settings = load_settings("containment-setup")
     subnet = settings.bridge_subnet
 
     try:
@@ -64,7 +64,7 @@ def containment_setup() -> None:
 
 def containment_status() -> None:
     """Report whether the host egress restriction is in effect."""
-    settings = load_global_config()
+    settings = load_settings("containment-status")
     subnet = settings.bridge_subnet
     state, marker = evaluate(settings.data_dir, subnet=subnet)
 

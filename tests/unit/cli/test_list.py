@@ -31,7 +31,7 @@ def test_list_shows_generated_twins_with_status(tmp_path: Path):
     settings = GlobalConfig(data_dir=tmp_path)
 
     with (
-        patch("honeytwin.cli.commands.list.load_global_config", return_value=settings),
+        patch("honeytwin.cli.commands.list.load_settings", return_value=settings),
         patch("honeytwin.cli.commands.list.get_client", return_value=MagicMock()),
         patch(
             "honeytwin.cli.commands.list.get_twin_container_status",
@@ -56,7 +56,7 @@ def test_list_honors_name_filter(tmp_path: Path):
     settings = GlobalConfig(data_dir=tmp_path)
 
     with (
-        patch("honeytwin.cli.commands.list.load_global_config", return_value=settings),
+        patch("honeytwin.cli.commands.list.load_settings", return_value=settings),
         patch("honeytwin.cli.commands.list.get_client", return_value=MagicMock()),
         patch("honeytwin.cli.commands.list.get_twin_container_status", return_value=None),
     ):
@@ -71,7 +71,7 @@ def test_list_filter_for_unknown_name_reports_clearly(tmp_path: Path):
     _make_twin(tmp_path, "web-01")
     settings = GlobalConfig(data_dir=tmp_path)
 
-    with patch("honeytwin.cli.commands.list.load_global_config", return_value=settings):
+    with patch("honeytwin.cli.commands.list.load_settings", return_value=settings):
         result = runner.invoke(app, ["list", "--name", "nope"])
 
     assert result.exit_code == 0, result.output
@@ -81,7 +81,7 @@ def test_list_filter_for_unknown_name_reports_clearly(tmp_path: Path):
 def test_list_with_no_twins_is_not_an_error(tmp_path: Path):
     settings = GlobalConfig(data_dir=tmp_path)
 
-    with patch("honeytwin.cli.commands.list.load_global_config", return_value=settings):
+    with patch("honeytwin.cli.commands.list.load_settings", return_value=settings):
         result = runner.invoke(app, ["list"])
 
     assert result.exit_code == 0, result.output
@@ -93,7 +93,7 @@ def test_list_still_lists_twins_when_docker_unavailable(tmp_path: Path):
     settings = GlobalConfig(data_dir=tmp_path)
 
     with (
-        patch("honeytwin.cli.commands.list.load_global_config", return_value=settings),
+        patch("honeytwin.cli.commands.list.load_settings", return_value=settings),
         patch(
             "honeytwin.cli.commands.list.get_client",
             side_effect=DockerUnavailableError("daemon not reachable"),

@@ -8,8 +8,7 @@ from typing import Annotated
 
 import typer
 
-from honeytwin.cli.commands._common import TWIN_NAME_OPTION
-from honeytwin.config.loader import load_global_config
+from honeytwin.cli.commands._common import TWIN_NAME_OPTION, load_settings
 from honeytwin.generate.generator import generate_twin_config
 from honeytwin.generate.store import save_twin_config
 from honeytwin.profile.store import ProfileLoadError, ProfileSchemaVersionError, load_profile
@@ -22,7 +21,7 @@ def generate(
     ],
 ) -> None:
     """Generate a twin configuration from a stored twin profile."""
-    settings = load_global_config()
+    settings = load_settings("generate")
 
     try:
         profile = load_profile(profile_path)

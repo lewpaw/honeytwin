@@ -56,3 +56,37 @@ def test_malformed_profiles_file_rejected(tmp_path: Path):
     bad.write_text("light: not-a-list\n", encoding="utf-8")
     with pytest.raises(NmapProfilesError):
         load_nmap_profiles(bad)
+
+
+def test_shipped_profiles_resolve_through_the_package():
+    """Read via importlib.resources rather than by walking __file__ parents,
+    so an installed wheel finds them too - `honeytwin scan` used to raise
+    NmapProfilesError for anyone who pip-installed the package."""
+    from importlib.resources import files
+
+    raw = files("honeytwin.data").joinpath("nmap_profiles.yaml").read_text(encoding="utf-8")
+    assert "light:" in raw
+
+
+def test_unreadable_packaged_profiles_report_a_broken_install(monkeypatch):
+    def boom(_package):
+        raise ModuleNotFoundError("honeytwin.data")
+
+    monkeypatch.setattr("honeytwin.scan.profiles.files", boom)
+    with pytest.raises(NmapProfilesError, match="install is incomplete"):
+        load_nmap_profiles()
+
+
+def test_explicit_profiles_path_still_wins_over_the_packaged_one(tmp_path: Path):
+    custom = tmp_path / "mine.yaml"
+    custom.write_text("only-mine:\n  - '-sT'\n", encoding="utf-8")
+
+    profiles = load_nmap_profiles(custom)
+
+    assert profiles == {"only-mine": ["-sT"]}
+
+
+def test_missing_explicit_profiles_path_names_that_path(tmp_path: Path):
+    missing = tmp_path / "nope.yaml"
+    with pytest.raises(NmapProfilesError, match="nope.yaml"):
+        load_nmap_profiles(missing)

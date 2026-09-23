@@ -16,7 +16,7 @@ def test_rescanning_same_target_keeps_prior_profile_and_adds_a_new_one(tmp_path:
     config = GlobalConfig(data_dir=tmp_path)
 
     with (
-        patch("honeytwin.cli.commands.scan.load_global_config", return_value=config),
+        patch("honeytwin.cli.commands.scan.load_settings", return_value=config),
         patch("honeytwin.cli.commands.scan.run_nmap", return_value=FIXTURE_XML),
     ):
         first = runner.invoke(app, ["scan", "192.0.2.10"])

@@ -1,32 +1,49 @@
-"""Loads the light/standard/deep nmap flag presets from config/nmap_profiles.yaml.
+"""Loads the light/standard/deep nmap flag presets from the shipped
+nmap_profiles.yaml.
 
-Operators can override the shipped file or point at their own via the
-`path` argument to `load_nmap_profiles`, per docs/PRD.md section 9.
+Operators can point at their own file via the `path` argument to
+`load_nmap_profiles`, per docs/PRD.md section 9. The shipped copy is read
+through `importlib.resources` rather than by locating it relative to this
+file, so it is found whether HoneyTwin runs from a source checkout or an
+installed package.
 """
 
 from __future__ import annotations
 
+from importlib.resources import files
 from pathlib import Path
 
 import yaml
 
-SHIPPED_PROFILES_PATH = (
-    Path(__file__).resolve().parent.parent.parent.parent / "config" / "nmap_profiles.yaml"
-)
+PROFILES_RESOURCE = "nmap_profiles.yaml"
 
 
 class NmapProfilesError(Exception):
     """Raised when the nmap profiles file is missing or malformed."""
 
 
+def _read_shipped_profiles() -> str:
+    """Read the nmap profiles file that ships inside the package."""
+    try:
+        return files("honeytwin.data").joinpath(PROFILES_RESOURCE).read_text(encoding="utf-8")
+    except (OSError, ModuleNotFoundError) as exc:
+        raise NmapProfilesError(
+            f"Could not read the packaged nmap profiles ({PROFILES_RESOURCE}): {exc}. "
+            f"This usually means the HoneyTwin install is incomplete."
+        ) from exc
+
+
 def load_nmap_profiles(path: Path | None = None) -> dict[str, list[str]]:
     """Load nmap profile name -> flag list mapping from YAML."""
-    source = path if path is not None else SHIPPED_PROFILES_PATH
+    source = path if path is not None else PROFILES_RESOURCE
 
-    try:
-        raw = source.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise NmapProfilesError(f"Could not read nmap profiles file {source}: {exc}") from exc
+    if path is None:
+        raw = _read_shipped_profiles()
+    else:
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise NmapProfilesError(f"Could not read nmap profiles file {path}: {exc}") from exc
 
     try:
         data = yaml.safe_load(raw)
