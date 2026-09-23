@@ -1,0 +1,29 @@
+# HoneyTwin nmap scan profile defaults. See docs/PRD.md section 9.
+# Each profile is the list of nmap flags used, in order, before the target
+# argument. Edit or add profiles here to change scan behavior without
+# touching code.
+
+light:
+  - "-sS"
+  - "-T4"
+  - "--top-ports"
+  - "100"
+  - "--stats-every"
+  - "5s"
+
+standard:
+  - "-sS"
+  - "-sV"
+  - "-T4"
+  - "--top-ports"
+  - "1000"
+  - "--stats-every"
+  - "5s"
+
+deep:
+  - "-A"
+  - "-p-"
+  - "-T4"
+  - "--script=default,version,banner"
+  - "--stats-every"
+  - "5s"

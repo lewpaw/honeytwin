@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Host with no open ports: everything scanned reports closed or filtered. -->
+<nmaprun scanner="nmap" args="nmap -sS -T4 --top-ports 100 192.0.2.30" start="1758000200" version="7.98">
+  <host starttime="1758000200" endtime="1758000205">
+    <status state="up" reason="syn-ack"/>
+    <address addr="192.0.2.30" addrtype="ipv4"/>
+    <ports>
+      <port protocol="tcp" portid="80">
+        <state state="closed" reason="reset"/>
+        <service name="http" method="table"/>
+      </port>
+      <port protocol="tcp" portid="443">
+        <state state="filtered" reason="no-response"/>
+        <service name="https" method="table"/>
+      </port>
+    </ports>
+  </host>
+  <runstats>
+    <finished time="1758000205" summary="Nmap done"/>
+  </runstats>
+</nmaprun>

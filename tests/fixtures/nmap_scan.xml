@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Minimal representative nmap XML fixture used by unit/integration tests. -->
+<nmaprun scanner="nmap" args="nmap -A -p- -T4 --script=default,version,banner 192.0.2.10" start="1758000000" version="7.98">
+  <host starttime="1758000000" endtime="1758000030">
+    <status state="up" reason="syn-ack"/>
+    <address addr="192.0.2.10" addrtype="ipv4"/>
+    <ports>
+      <port protocol="tcp" portid="22">
+        <state state="open" reason="syn-ack"/>
+        <service name="ssh" product="OpenSSH" version="8.9p1" method="probed"/>
+        <script id="banner" output="SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.6"/>
+      </port>
+      <port protocol="tcp" portid="80">
+        <state state="open" reason="syn-ack"/>
+        <service name="http" product="nginx" version="1.18.0" method="probed"/>
+        <script id="http-server-header" output="nginx/1.18.0 (Ubuntu)"/>
+      </port>
+      <port protocol="tcp" portid="443">
+        <state state="closed" reason="reset"/>
+        <service name="https" method="table"/>
+      </port>
+    </ports>
+    <os>
+      <osmatch name="Linux 5.4 - 5.15" accuracy="95"/>
+    </os>
+  </host>
+  <runstats>
+    <finished time="1758000030" summary="Nmap done"/>
+  </runstats>
+</nmaprun>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A single port with more than one NSE script result. -->
+<nmaprun scanner="nmap" args="nmap -A -p- -T4 --script=default,version,banner 192.0.2.40" start="1758000300" version="7.98">
+  <host starttime="1758000300" endtime="1758000330">
+    <status state="up" reason="syn-ack"/>
+    <address addr="192.0.2.40" addrtype="ipv4"/>
+    <ports>
+      <port protocol="tcp" portid="21">
+        <state state="open" reason="syn-ack"/>
+        <service name="ftp" product="vsftpd" version="3.0.5" method="probed"/>
+        <script id="banner" output="220 (vsFTPd 3.0.5)"/>
+        <script id="ftp-anon" output="Anonymous FTP login allowed (FTP code 230)"/>
+        <script id="ftp-syst" output="STAT: FTP server status"/>
+      </port>
+    </ports>
+    <os>
+      <osmatch name="Linux 4.15 - 5.19" accuracy="93"/>
+    </os>
+  </host>
+  <runstats>
+    <finished time="1758000330" summary="Nmap done"/>
+  </runstats>
+</nmaprun>

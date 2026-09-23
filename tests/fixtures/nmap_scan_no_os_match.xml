@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Host scanned without OS detection: no <os> element at all. -->
+<nmaprun scanner="nmap" args="nmap -sS -sV -T4 --top-ports 1000 192.0.2.20" start="1758000100" version="7.98">
+  <host starttime="1758000100" endtime="1758000110">
+    <status state="up" reason="syn-ack"/>
+    <address addr="192.0.2.20" addrtype="ipv4"/>
+    <ports>
+      <port protocol="tcp" portid="22">
+        <state state="open" reason="syn-ack"/>
+        <service name="ssh" product="OpenSSH" version="9.0" method="probed"/>
+      </port>
+    </ports>
+  </host>
+  <runstats>
+    <finished time="1758000110" summary="Nmap done"/>
+  </runstats>
+</nmaprun>

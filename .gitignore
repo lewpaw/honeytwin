@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+test-results/
+
+# Internal planning/process artifacts, kept local rather than public.
+docs/
+openspec/
+.claude/

@@ -1,0 +1,7 @@
+# HoneyTwin global default configuration.
+# A user-level global config file (if provided) overrides these values;
+# a per-twin config file overrides both. See docs/PRD.md section 9.
+
+max_payload_bytes: 65536
+exposure_scope: local
+docker_network_mode: macvlan
