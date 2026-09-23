@@ -15,6 +15,7 @@ from docker.models.networks import Network
 from honeytwin.config.schema import DockerNetworkMode, ExposureScope
 
 TWIN_CONFIG_MOUNT_PATH = "/etc/honeytwin/twin.json"
+TWIN_LOG_MOUNT_PATH = "/var/log/honeytwin"
 
 
 class DockerUnavailableError(Exception):
@@ -90,21 +91,32 @@ def create_twin_container(
     name: str,
     image: str,
     config_path: Path,
+    log_dir: Path,
     ports: list[int],
     network_mode: DockerNetworkMode,
     network_name: str,
     exposure_scope: ExposureScope,
+    run_as_user: str | None = None,
 ) -> Container:
     """Create (but do not start) a twin's container.
 
     Bridge mode publishes the twin's ports on the host (bound per
     `exposure_scope`); macvlan mode needs no port publishing since the
     container has its own directly-reachable LAN IP. Either way, the
-    twin's generated config is bind-mounted read-only, and the container
-    is granted `NET_BIND_SERVICE` so its non-root user (set by the image)
-    can still bind privileged ports.
+    twin's generated config is bind-mounted read-only, `log_dir` is
+    bind-mounted read-write for the listener's local event log and
+    attacker records, and the container is granted `NET_BIND_SERVICE` so
+    its non-root user can still bind privileged ports.
+
+    `run_as_user` ("uid:gid") overrides the image's built-in non-root
+    user. On Linux this must be set to the host user owning `log_dir`,
+    or the container can't write its logs there — the image's own uid
+    won't match the host's. It stays non-root either way.
     """
-    volumes = {str(config_path): {"bind": TWIN_CONFIG_MOUNT_PATH, "mode": "ro"}}
+    volumes = {
+        str(config_path): {"bind": TWIN_CONFIG_MOUNT_PATH, "mode": "ro"},
+        str(log_dir): {"bind": TWIN_LOG_MOUNT_PATH, "mode": "rw"},
+    }
 
     port_bindings = None
     if network_mode is DockerNetworkMode.BRIDGE:
@@ -113,6 +125,10 @@ def create_twin_container(
         )
         port_bindings = {f"{p}/tcp": (bind_host, p) for p in ports}
 
+    create_kwargs = {}
+    if run_as_user is not None:
+        create_kwargs["user"] = run_as_user
+
     return client.containers.create(
         image,
         name=name,
@@ -120,6 +136,7 @@ def create_twin_container(
         ports=port_bindings,
         volumes=volumes,
         cap_add=["NET_BIND_SERVICE"],
+        **create_kwargs,
     )
 
 

@@ -76,6 +76,28 @@ def test_run_internet_twin_prints_warning_before_start(tmp_path: Path):
     assert result.output.index("reachable from any network") < result.output.index("started")
 
 
+def test_run_creates_log_dir_and_passes_it_to_container(tmp_path: Path):
+    _local_config(tmp_path)
+    settings = GlobalConfig(data_dir=tmp_path)
+    mock_client = MagicMock()
+
+    with (
+        patch("honeytwin.cli.commands.run.load_global_config", return_value=settings),
+        patch("honeytwin.cli.commands.run.get_client", return_value=mock_client),
+        patch("honeytwin.cli.commands.run.create_bridge_network") as mock_create_bridge,
+        patch("honeytwin.cli.commands.run.create_twin_container") as mock_create_container,
+        patch("honeytwin.cli.commands.run.start_twin_container"),
+    ):
+        mock_create_bridge.return_value.name = "honeytwin-bridge"
+        result = runner.invoke(app, ["run", "--name", "web-01"])
+
+    assert result.exit_code == 0, result.output
+
+    expected_log_dir = tmp_path / "logs" / "web-01"
+    assert expected_log_dir.exists()
+    assert mock_create_container.call_args.kwargs["log_dir"] == expected_log_dir
+
+
 def test_run_missing_twin_config_exits_nonzero_with_clear_error(tmp_path: Path):
     settings = GlobalConfig(data_dir=tmp_path)
 

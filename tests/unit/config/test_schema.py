@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from honeytwin.config.schema import DockerNetworkMode, ExposureScope, GlobalConfig, TwinConfig
+from honeytwin.config.schema import (
+    DockerNetworkMode,
+    ExposureScope,
+    GlobalConfig,
+    SyslogProtocol,
+    TwinConfig,
+)
 
 
 def test_global_config_defaults():
@@ -10,6 +16,10 @@ def test_global_config_defaults():
     assert cfg.exposure_scope is ExposureScope.LOCAL
     assert cfg.docker_network_mode is DockerNetworkMode.MACVLAN
     assert cfg.scan_timeout_seconds == 600
+    assert cfg.syslog_enabled is False
+    assert cfg.syslog_host is None
+    assert cfg.syslog_port == 514
+    assert cfg.syslog_protocol is SyslogProtocol.UDP
 
 
 def test_global_config_explicit_values():
@@ -19,12 +29,20 @@ def test_global_config_explicit_values():
         exposure_scope=ExposureScope.INTERNET,
         docker_network_mode=DockerNetworkMode.BRIDGE,
         scan_timeout_seconds=120,
+        syslog_enabled=True,
+        syslog_host="syslog.example.com",
+        syslog_port=6514,
+        syslog_protocol=SyslogProtocol.TCP,
     )
     assert cfg.data_dir == Path("/tmp/honeytwin")
     assert cfg.max_payload_bytes == 1024
     assert cfg.exposure_scope is ExposureScope.INTERNET
     assert cfg.docker_network_mode is DockerNetworkMode.BRIDGE
     assert cfg.scan_timeout_seconds == 120
+    assert cfg.syslog_enabled is True
+    assert cfg.syslog_host == "syslog.example.com"
+    assert cfg.syslog_port == 6514
+    assert cfg.syslog_protocol is SyslogProtocol.TCP
 
 
 def test_twin_config_fields_optional():
@@ -33,12 +51,26 @@ def test_twin_config_fields_optional():
     assert cfg.exposure_scope is None
     assert cfg.docker_network_mode is None
     assert cfg.scan_timeout_seconds is None
+    assert cfg.syslog_enabled is None
+    assert cfg.syslog_host is None
+    assert cfg.syslog_port is None
+    assert cfg.syslog_protocol is None
 
 
 def test_twin_config_can_override():
     cfg = TwinConfig(
-        max_payload_bytes=2048, exposure_scope=ExposureScope.INTERNET, scan_timeout_seconds=60
+        max_payload_bytes=2048,
+        exposure_scope=ExposureScope.INTERNET,
+        scan_timeout_seconds=60,
+        syslog_enabled=True,
+        syslog_host="syslog.example.com",
+        syslog_port=1514,
+        syslog_protocol=SyslogProtocol.TCP,
     )
     assert cfg.max_payload_bytes == 2048
     assert cfg.exposure_scope is ExposureScope.INTERNET
     assert cfg.scan_timeout_seconds == 60
+    assert cfg.syslog_enabled is True
+    assert cfg.syslog_host == "syslog.example.com"
+    assert cfg.syslog_port == 1514
+    assert cfg.syslog_protocol is SyslogProtocol.TCP

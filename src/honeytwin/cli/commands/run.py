@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Annotated
 
 import typer
@@ -25,10 +26,22 @@ from honeytwin.generate.store import (
     load_twin_config,
     twin_dir,
 )
+from honeytwin.logging.writer import twin_log_dir
 
 TWIN_IMAGE = "honeytwin-twin:local"
 BRIDGE_NETWORK_NAME = "honeytwin-bridge"
 MACVLAN_NETWORK_NAME = "honeytwin-macvlan"
+
+
+def _host_user_spec() -> str | None:
+    """The "uid:gid" the twin container should run as, so it can write to
+    the host-owned log directory. `None` on platforms without POSIX uids
+    (Windows), where bind mounts don't enforce ownership anyway."""
+    getuid = getattr(os, "getuid", None)
+    getgid = getattr(os, "getgid", None)
+    if getuid is None or getgid is None:
+        return None
+    return f"{getuid()}:{getgid()}"
 
 
 def run(name: Annotated[str, TWIN_NAME_OPTION]) -> None:
@@ -69,15 +82,20 @@ def run(name: Annotated[str, TWIN_NAME_OPTION]) -> None:
         network = create_bridge_network(client, name=BRIDGE_NETWORK_NAME)
 
     config_path = twin_dir(name, settings.data_dir) / CONFIG_FILENAME
+    log_dir = twin_log_dir(name, settings.data_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+
     create_twin_container(
         client,
         name=twin_config.name,
         image=TWIN_IMAGE,
         config_path=config_path,
+        log_dir=log_dir,
         ports=[p.port for p in twin_config.ports],
         network_mode=twin_config.docker_network_mode,
         network_name=network.name,
         exposure_scope=twin_config.exposure_scope,
+        run_as_user=_host_user_spec(),
     )
     start_twin_container(client, name=twin_config.name)
 

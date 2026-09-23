@@ -46,12 +46,18 @@ def disposable_nginx_container() -> Iterator[tuple[str, int]]:
         name=name,
     )
     try:
-        deadline = time.monotonic() + 15
+        # Docker reporting "running" only means the container started, not
+        # that nginx is accepting connections yet - poll the port itself,
+        # otherwise tests race the service's startup under load.
+        deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
-            container.reload()
-            if container.status == "running":
-                break
-            time.sleep(0.5)
+            try:
+                with socket.create_connection((host, port), timeout=1):
+                    break
+            except OSError:
+                time.sleep(0.25)
+        else:
+            pytest.fail(f"nginx container {name} never became reachable on {host}:{port}")
         yield host, port
     finally:
         container.remove(force=True)

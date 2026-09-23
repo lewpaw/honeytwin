@@ -65,6 +65,8 @@ def test_generated_twin_replays_banner_and_holds_no_banner_port_open(tmp_path: P
     )
     twin_config = generate_twin_config(profile, "integration-twin", settings)
     config_path = save_twin_config(twin_config, tmp_path)
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     client = get_client()
     network = create_bridge_network(client, name="honeytwin-test-bridge")
@@ -76,6 +78,7 @@ def test_generated_twin_replays_banner_and_holds_no_banner_port_open(tmp_path: P
             name=container_name,
             image=TWIN_IMAGE,
             config_path=config_path,
+            log_dir=log_dir,
             ports=[p.port for p in twin_config.ports],
             network_mode=DockerNetworkMode.BRIDGE,
             network_name=network.name,
@@ -122,6 +125,8 @@ def test_local_scope_bridge_binds_to_discovered_lan_address(tmp_path: Path):
     )
     twin_config = generate_twin_config(profile, "local-scope-twin", settings)
     config_path = save_twin_config(twin_config, tmp_path)
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     client = get_client()
     network = create_bridge_network(client, name="honeytwin-test-bridge")
@@ -133,6 +138,7 @@ def test_local_scope_bridge_binds_to_discovered_lan_address(tmp_path: Path):
             name=container_name,
             image=TWIN_IMAGE,
             config_path=config_path,
+            log_dir=log_dir,
             ports=[port],
             network_mode=DockerNetworkMode.BRIDGE,
             network_name=network.name,

@@ -1,6 +1,11 @@
 from datetime import UTC, datetime
 
-from honeytwin.config.schema import DockerNetworkMode, ExposureScope, GlobalConfig
+from honeytwin.config.schema import (
+    DockerNetworkMode,
+    ExposureScope,
+    GlobalConfig,
+    SyslogProtocol,
+)
 from honeytwin.generate.generator import generate_twin_config
 from honeytwin.profile.schema import PortInfo, ScanProfileName, TwinProfile
 
@@ -55,3 +60,22 @@ def test_generate_carries_network_mode_and_exposure_scope():
     assert config.exposure_scope is ExposureScope.INTERNET
     assert config.name == "web-01"
     assert config.target == "192.0.2.10"
+
+
+def test_generate_carries_logging_settings():
+    profile = _profile_with_mixed_ports()
+    settings = GlobalConfig(
+        max_payload_bytes=1024,
+        syslog_enabled=True,
+        syslog_host="syslog.example.com",
+        syslog_port=1514,
+        syslog_protocol=SyslogProtocol.TCP,
+    )
+
+    config = generate_twin_config(profile, "web-01", settings)
+
+    assert config.max_payload_bytes == 1024
+    assert config.syslog_enabled is True
+    assert config.syslog_host == "syslog.example.com"
+    assert config.syslog_port == 1514
+    assert config.syslog_protocol is SyslogProtocol.TCP

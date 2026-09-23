@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from honeytwin.config.schema import DockerNetworkMode, ExposureScope
+from honeytwin.config.schema import DockerNetworkMode, ExposureScope, SyslogProtocol
 
 
 class TwinPortConfig(BaseModel):
@@ -27,3 +27,8 @@ class TwinConfigFile(BaseModel):
     ports: list[TwinPortConfig] = Field(default_factory=list)
     docker_network_mode: DockerNetworkMode
     exposure_scope: ExposureScope
+    max_payload_bytes: int = 65536
+    syslog_enabled: bool = False
+    syslog_host: str | None = None
+    syslog_port: int = 514
+    syslog_protocol: SyslogProtocol = SyslogProtocol.UDP

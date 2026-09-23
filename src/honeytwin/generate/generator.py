@@ -27,4 +27,9 @@ def generate_twin_config(
         ports=ports,
         docker_network_mode=twin_settings.docker_network_mode,
         exposure_scope=twin_settings.exposure_scope,
+        max_payload_bytes=twin_settings.max_payload_bytes,
+        syslog_enabled=twin_settings.syslog_enabled,
+        syslog_host=twin_settings.syslog_host,
+        syslog_port=twin_settings.syslog_port,
+        syslog_protocol=twin_settings.syslog_protocol,
     )

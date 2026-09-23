@@ -1,4 +1,4 @@
-from honeytwin.config.schema import DockerNetworkMode, ExposureScope
+from honeytwin.config.schema import DockerNetworkMode, ExposureScope, SyslogProtocol
 from honeytwin.generate.schema import TwinConfigFile, TwinPortConfig
 
 
@@ -27,3 +27,36 @@ def test_twin_config_file_defaults_empty_ports():
         exposure_scope=ExposureScope.INTERNET,
     )
     assert config.ports == []
+
+
+def test_twin_config_file_logging_field_defaults():
+    config = TwinConfigFile(
+        name="web-01",
+        target="192.0.2.10",
+        docker_network_mode=DockerNetworkMode.MACVLAN,
+        exposure_scope=ExposureScope.LOCAL,
+    )
+    assert config.max_payload_bytes == 65536
+    assert config.syslog_enabled is False
+    assert config.syslog_host is None
+    assert config.syslog_port == 514
+    assert config.syslog_protocol is SyslogProtocol.UDP
+
+
+def test_twin_config_file_logging_field_explicit_values():
+    config = TwinConfigFile(
+        name="web-01",
+        target="192.0.2.10",
+        docker_network_mode=DockerNetworkMode.MACVLAN,
+        exposure_scope=ExposureScope.LOCAL,
+        max_payload_bytes=1024,
+        syslog_enabled=True,
+        syslog_host="syslog.example.com",
+        syslog_port=1514,
+        syslog_protocol=SyslogProtocol.TCP,
+    )
+    assert config.max_payload_bytes == 1024
+    assert config.syslog_enabled is True
+    assert config.syslog_host == "syslog.example.com"
+    assert config.syslog_port == 1514
+    assert config.syslog_protocol is SyslogProtocol.TCP

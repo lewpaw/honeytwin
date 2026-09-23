@@ -20,7 +20,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger(__name__)
 
 
-async def _main(config_path: Path) -> None:
+DEFAULT_LOG_DIR = Path("/var/log/honeytwin")
+
+
+async def _main(config_path: Path, log_dir: Path) -> None:
     config = TwinConfigFile.model_validate_json(config_path.read_text(encoding="utf-8"))
     logger.info("starting twin %r with %d listener(s)", config.name, len(config.ports))
 
@@ -33,7 +36,7 @@ async def _main(config_path: Path) -> None:
         except (NotImplementedError, RuntimeError):
             pass  # platform doesn't support this; default signal handling applies
 
-    await run_listeners(config, stop_event=stop_event)
+    await run_listeners(config, stop_event=stop_event, log_dir=log_dir)
     logger.info("twin %r stopped", config.name)
 
 
@@ -42,13 +45,19 @@ def main() -> None:
     parser.add_argument(
         "--config", required=True, type=Path, help="Path to a twin config JSON file."
     )
+    parser.add_argument(
+        "--log-dir",
+        type=Path,
+        default=DEFAULT_LOG_DIR,
+        help="Directory to write local connection event logs to.",
+    )
     args = parser.parse_args()
 
     if not args.config.exists():
         print(f"honeytwin runtime: config file not found: {args.config}", file=sys.stderr)
         raise SystemExit(1)
 
-    asyncio.run(_main(args.config))
+    asyncio.run(_main(args.config, args.log_dir))
 
 
 if __name__ == "__main__":

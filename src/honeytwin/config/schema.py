@@ -27,6 +27,13 @@ class DockerNetworkMode(StrEnum):
     BRIDGE = "bridge"
 
 
+class SyslogProtocol(StrEnum):
+    """Transport used to forward events to a syslog collector."""
+
+    UDP = "udp"
+    TCP = "tcp"
+
+
 class GlobalConfig(BaseModel):
     """Settings shared by all twins unless a twin overrides them."""
 
@@ -64,6 +71,23 @@ class GlobalConfig(BaseModel):
         default=None,
         description="Gateway IP for the macvlan network.",
     )
+    syslog_enabled: bool = Field(
+        default=False,
+        description="Whether to forward connection events to a syslog collector.",
+    )
+    syslog_host: str | None = Field(
+        default=None,
+        description="Syslog collector hostname/IP.",
+    )
+    syslog_port: int = Field(
+        default=514,
+        gt=0,
+        description="Syslog collector port.",
+    )
+    syslog_protocol: SyslogProtocol = Field(
+        default=SyslogProtocol.UDP,
+        description="Transport used to send syslog messages.",
+    )
 
 
 class TwinConfig(BaseModel):
@@ -76,3 +100,7 @@ class TwinConfig(BaseModel):
     macvlan_parent_interface: str | None = None
     macvlan_subnet: str | None = None
     macvlan_gateway: str | None = None
+    syslog_enabled: bool | None = None
+    syslog_host: str | None = None
+    syslog_port: int | None = Field(default=None, gt=0)
+    syslog_protocol: SyslogProtocol | None = None

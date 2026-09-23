@@ -7,6 +7,7 @@ from docker.errors import DockerException, NotFound
 from honeytwin.config.schema import DockerNetworkMode, ExposureScope
 from honeytwin.docker.client import (
     TWIN_CONFIG_MOUNT_PATH,
+    TWIN_LOG_MOUNT_PATH,
     DockerUnavailableError,
     create_bridge_network,
     create_macvlan_network,
@@ -106,6 +107,7 @@ def test_create_twin_container_bridge_mode_internet_binds_all_interfaces():
         name="web-01",
         image="honeytwin-twin:local",
         config_path=Path("/data/twins/web-01/config.json"),
+        log_dir=Path("/data/logs/web-01"),
         ports=[22, 80],
         network_mode=DockerNetworkMode.BRIDGE,
         network_name="honeytwin-bridge",
@@ -125,7 +127,11 @@ def test_create_twin_container_bridge_mode_internet_binds_all_interfaces():
         str(Path("/data/twins/web-01/config.json")): {
             "bind": TWIN_CONFIG_MOUNT_PATH,
             "mode": "ro",
-        }
+        },
+        str(Path("/data/logs/web-01")): {
+            "bind": TWIN_LOG_MOUNT_PATH,
+            "mode": "rw",
+        },
     }
 
 
@@ -138,6 +144,7 @@ def test_create_twin_container_bridge_mode_local_binds_discovered_address(monkey
         name="web-01",
         image="honeytwin-twin:local",
         config_path=Path("/data/twins/web-01/config.json"),
+        log_dir=Path("/data/logs/web-01"),
         ports=[22],
         network_mode=DockerNetworkMode.BRIDGE,
         network_name="honeytwin-bridge",
@@ -156,6 +163,7 @@ def test_create_twin_container_macvlan_mode_publishes_no_ports():
         name="web-01",
         image="honeytwin-twin:local",
         config_path=Path("/data/twins/web-01/config.json"),
+        log_dir=Path("/data/logs/web-01"),
         ports=[22, 80],
         network_mode=DockerNetworkMode.MACVLAN,
         network_name="honeytwin-macvlan",
@@ -165,6 +173,65 @@ def test_create_twin_container_macvlan_mode_publishes_no_ports():
     call = mock_client.containers.create.call_args
     assert call.kwargs["ports"] is None
     assert call.kwargs["network"] == "honeytwin-macvlan"
+
+
+def test_create_twin_container_passes_run_as_user_when_given():
+    mock_client = MagicMock()
+
+    create_twin_container(
+        mock_client,
+        name="web-01",
+        image="honeytwin-twin:local",
+        config_path=Path("/data/twins/web-01/config.json"),
+        log_dir=Path("/data/logs/web-01"),
+        ports=[22],
+        network_mode=DockerNetworkMode.BRIDGE,
+        network_name="honeytwin-bridge",
+        exposure_scope=ExposureScope.LOCAL,
+        run_as_user="1001:1001",
+    )
+
+    assert mock_client.containers.create.call_args.kwargs["user"] == "1001:1001"
+
+
+def test_create_twin_container_omits_user_when_not_given():
+    mock_client = MagicMock()
+
+    create_twin_container(
+        mock_client,
+        name="web-01",
+        image="honeytwin-twin:local",
+        config_path=Path("/data/twins/web-01/config.json"),
+        log_dir=Path("/data/logs/web-01"),
+        ports=[22],
+        network_mode=DockerNetworkMode.BRIDGE,
+        network_name="honeytwin-bridge",
+        exposure_scope=ExposureScope.LOCAL,
+    )
+
+    assert "user" not in mock_client.containers.create.call_args.kwargs
+
+
+def test_create_twin_container_includes_log_mount():
+    mock_client = MagicMock()
+
+    create_twin_container(
+        mock_client,
+        name="web-01",
+        image="honeytwin-twin:local",
+        config_path=Path("/data/twins/web-01/config.json"),
+        log_dir=Path("/data/logs/web-01"),
+        ports=[22],
+        network_mode=DockerNetworkMode.MACVLAN,
+        network_name="honeytwin-macvlan",
+        exposure_scope=ExposureScope.LOCAL,
+    )
+
+    call = mock_client.containers.create.call_args
+    assert call.kwargs["volumes"][str(Path("/data/logs/web-01"))] == {
+        "bind": TWIN_LOG_MOUNT_PATH,
+        "mode": "rw",
+    }
 
 
 def test_start_twin_container_calls_start():
