@@ -45,7 +45,7 @@ app.command(
     name="generate", help="Generate a honeypot twin configuration from a stored twin profile."
 )(generate.generate)
 app.command(name="run", help="Run a generated twin.")(run.run)
-app.command(name="list", help="List running twins, optionally filtered by name.")(
+app.command(name="list", help="List generated twins and their status, optionally by name.")(
     list_command.list_twins
 )
 app.command(name="stop", help="Stop a running twin.")(stop.stop)

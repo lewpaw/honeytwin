@@ -9,6 +9,7 @@ build/
 test-results/
 
 # Internal planning/process artifacts, kept local rather than public.
-docs/
+# docs/ itself is public; only docs/private/ is not.
+docs/private/
 openspec/
 .claude/
