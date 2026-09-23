@@ -46,18 +46,22 @@ def disposable_nginx_container() -> Iterator[tuple[str, int]]:
         name=name,
     )
     try:
-        # Docker reporting "running" only means the container started, not
-        # that nginx is accepting connections yet - poll the port itself,
-        # otherwise tests race the service's startup under load.
+        # Readiness has to be proven by a real response, not a successful
+        # connect: Docker's host-side port proxy accepts connections before
+        # nginx inside the container is listening, so a connect-only probe
+        # passes while requests still come back empty.
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
             try:
-                with socket.create_connection((host, port), timeout=1):
-                    break
+                with socket.create_connection((host, port), timeout=1) as probe:
+                    probe.sendall(b"GET / HTTP/1.0\r\n\r\n")
+                    if probe.recv(64):
+                        break
             except OSError:
-                time.sleep(0.25)
+                pass
+            time.sleep(0.25)
         else:
-            pytest.fail(f"nginx container {name} never became reachable on {host}:{port}")
+            pytest.fail(f"nginx container {name} never served a response on {host}:{port}")
         yield host, port
     finally:
         container.remove(force=True)

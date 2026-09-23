@@ -43,16 +43,16 @@ def test_run_with_no_generated_twin_config_exits_nonzero(tmp_path: Path):
     assert "No generated config found" in result.output
 
 
-def test_stop_stub_requires_name_and_exits_nonzero():
-    result = runner.invoke(app, ["stop", "--name", "web-01"])
+def test_stop_requires_name():
+    result = runner.invoke(app, ["stop"])
     assert result.exit_code != 0
-    assert "not yet implemented" in result.output
 
 
-def test_list_stub_name_is_optional_and_exits_nonzero():
-    result = runner.invoke(app, ["list"])
-    assert result.exit_code != 0
-    assert "not yet implemented" in result.output
+def test_list_name_is_optional(tmp_path: Path):
+    settings = GlobalConfig(data_dir=tmp_path)
+    with patch("honeytwin.cli.commands.list.load_global_config", return_value=settings):
+        result = runner.invoke(app, ["list"])
+    assert result.exit_code == 0
 
 
 def test_run_and_stop_share_identical_name_flag():

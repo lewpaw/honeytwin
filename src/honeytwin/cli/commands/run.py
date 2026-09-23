@@ -18,6 +18,7 @@ from honeytwin.docker.client import (
     create_macvlan_network,
     create_twin_container,
     get_client,
+    get_twin_container_status,
     start_twin_container,
 )
 from honeytwin.generate.store import (
@@ -54,14 +55,24 @@ def run(name: Annotated[str, TWIN_NAME_OPTION]) -> None:
         typer.echo(f"honeytwin run: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    if twin_config.exposure_scope is ExposureScope.INTERNET:
-        print_internet_exposure_warning()
-
     try:
         client = get_client()
     except DockerUnavailableError as exc:
         typer.echo(f"honeytwin run: {exc}", err=True)
         raise typer.Exit(code=1) from exc
+
+    if get_twin_container_status(client, name=twin_config.name) is not None:
+        typer.echo(
+            f"honeytwin run: twin {name!r} is already running "
+            f"(stop it first with: honeytwin stop --name {name})",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    # Warn only once the twin is actually going to start - warning about
+    # internet exposure for a run that then refuses would be misleading.
+    if twin_config.exposure_scope is ExposureScope.INTERNET:
+        print_internet_exposure_warning()
 
     if twin_config.docker_network_mode is DockerNetworkMode.MACVLAN:
         if not settings.macvlan_parent_interface or not settings.macvlan_subnet:

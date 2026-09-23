@@ -13,6 +13,7 @@ from honeytwin.docker.client import (
     create_macvlan_network,
     create_twin_container,
     get_client,
+    get_twin_container_status,
     remove_twin_container,
     start_twin_container,
     stop_twin_container,
@@ -232,6 +233,21 @@ def test_create_twin_container_includes_log_mount():
         "bind": TWIN_LOG_MOUNT_PATH,
         "mode": "rw",
     }
+
+
+def test_get_twin_container_status_returns_status_when_container_exists():
+    mock_client = MagicMock()
+    mock_client.containers.get.return_value.status = "running"
+
+    assert get_twin_container_status(mock_client, name="web-01") == "running"
+    mock_client.containers.get.assert_called_once_with("web-01")
+
+
+def test_get_twin_container_status_returns_none_when_not_found():
+    mock_client = MagicMock()
+    mock_client.containers.get.side_effect = NotFound("no such container")
+
+    assert get_twin_container_status(mock_client, name="web-01") is None
 
 
 def test_start_twin_container_calls_start():

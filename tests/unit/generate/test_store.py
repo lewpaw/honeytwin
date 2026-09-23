@@ -4,7 +4,12 @@ import pytest
 
 from honeytwin.config.schema import DockerNetworkMode, ExposureScope
 from honeytwin.generate.schema import TwinConfigFile, TwinPortConfig
-from honeytwin.generate.store import TwinConfigLoadError, load_twin_config, save_twin_config
+from honeytwin.generate.store import (
+    TwinConfigLoadError,
+    list_twin_names,
+    load_twin_config,
+    save_twin_config,
+)
 
 
 def _make_config() -> TwinConfigFile:
@@ -40,3 +45,19 @@ def test_load_invalid_config_raises(tmp_path: Path):
 
     with pytest.raises(TwinConfigLoadError, match="failed validation"):
         load_twin_config("bad-twin", tmp_path)
+
+
+def test_list_twin_names_returns_only_twins_with_configs(tmp_path: Path):
+    for name in ("web-01", "ssh-02"):
+        config = _make_config()
+        config.name = name
+        save_twin_config(config, tmp_path)
+
+    # A directory without a config.json isn't a twin.
+    (tmp_path / "twins" / "half-made").mkdir(parents=True)
+
+    assert list_twin_names(tmp_path) == ["ssh-02", "web-01"]
+
+
+def test_list_twin_names_empty_when_no_twins_dir(tmp_path: Path):
+    assert list_twin_names(tmp_path) == []

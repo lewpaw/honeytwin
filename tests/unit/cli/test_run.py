@@ -43,6 +43,7 @@ def test_run_local_twin_no_warning_and_starts_container(tmp_path: Path):
     with (
         patch("honeytwin.cli.commands.run.load_global_config", return_value=settings),
         patch("honeytwin.cli.commands.run.get_client", return_value=mock_client),
+        patch("honeytwin.cli.commands.run.get_twin_container_status", return_value=None),
         patch("honeytwin.cli.commands.run.create_bridge_network") as mock_create_bridge,
         patch("honeytwin.cli.commands.run.create_twin_container") as mock_create_container,
         patch("honeytwin.cli.commands.run.start_twin_container") as mock_start,
@@ -64,6 +65,7 @@ def test_run_internet_twin_prints_warning_before_start(tmp_path: Path):
     with (
         patch("honeytwin.cli.commands.run.load_global_config", return_value=settings),
         patch("honeytwin.cli.commands.run.get_client", return_value=mock_client),
+        patch("honeytwin.cli.commands.run.get_twin_container_status", return_value=None),
         patch("honeytwin.cli.commands.run.create_bridge_network") as mock_create_bridge,
         patch("honeytwin.cli.commands.run.create_twin_container"),
         patch("honeytwin.cli.commands.run.start_twin_container"),
@@ -84,6 +86,7 @@ def test_run_creates_log_dir_and_passes_it_to_container(tmp_path: Path):
     with (
         patch("honeytwin.cli.commands.run.load_global_config", return_value=settings),
         patch("honeytwin.cli.commands.run.get_client", return_value=mock_client),
+        patch("honeytwin.cli.commands.run.get_twin_container_status", return_value=None),
         patch("honeytwin.cli.commands.run.create_bridge_network") as mock_create_bridge,
         patch("honeytwin.cli.commands.run.create_twin_container") as mock_create_container,
         patch("honeytwin.cli.commands.run.start_twin_container"),
@@ -123,8 +126,29 @@ def test_run_macvlan_without_required_settings_exits_nonzero(tmp_path: Path):
     with (
         patch("honeytwin.cli.commands.run.load_global_config", return_value=settings),
         patch("honeytwin.cli.commands.run.get_client", return_value=mock_client),
+        patch("honeytwin.cli.commands.run.get_twin_container_status", return_value=None),
     ):
         result = runner.invoke(app, ["run", "--name", "web-01"])
 
     assert result.exit_code != 0
     assert "macvlan mode requires" in result.output
+
+
+def test_run_refuses_when_twin_already_running(tmp_path: Path):
+    _local_config(tmp_path)
+    settings = GlobalConfig(data_dir=tmp_path)
+    mock_client = MagicMock()
+
+    with (
+        patch("honeytwin.cli.commands.run.load_global_config", return_value=settings),
+        patch("honeytwin.cli.commands.run.get_client", return_value=mock_client),
+        patch("honeytwin.cli.commands.run.get_twin_container_status", return_value="running"),
+        patch("honeytwin.cli.commands.run.create_twin_container") as mock_create_container,
+        patch("honeytwin.cli.commands.run.start_twin_container") as mock_start,
+    ):
+        result = runner.invoke(app, ["run", "--name", "web-01"])
+
+    assert result.exit_code != 0
+    assert "already running" in result.output
+    mock_create_container.assert_not_called()
+    mock_start.assert_not_called()

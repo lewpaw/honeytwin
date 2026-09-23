@@ -140,6 +140,19 @@ def create_twin_container(
     )
 
 
+def get_twin_container_status(client: docker.DockerClient, *, name: str) -> str | None:
+    """The twin container's status (e.g. "running", "exited"), or None if
+    no container exists for that twin.
+
+    Absence is an ordinary answer to "is this twin running?", not an
+    error, so `NotFound` is handled here rather than pushed onto callers.
+    """
+    try:
+        return client.containers.get(name).status
+    except NotFound:
+        return None
+
+
 def start_twin_container(client: docker.DockerClient, *, name: str) -> None:
     """Start a twin's already-created container."""
     container = client.containers.get(name)

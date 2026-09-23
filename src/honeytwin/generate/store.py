@@ -32,6 +32,20 @@ def twin_dir(name: str, data_dir: Path) -> Path:
     return data_dir / TWINS_SUBDIR / _safe_twin_dirname(name)
 
 
+def list_twin_names(data_dir: Path) -> list[str]:
+    """Names of every twin with a generated config, sorted.
+
+    A directory without a config.json isn't a twin (it may be a partial
+    or unrelated directory), so it's skipped rather than reported.
+    """
+    twins_root = data_dir / TWINS_SUBDIR
+    if not twins_root.is_dir():
+        return []
+    return sorted(
+        entry.name for entry in twins_root.iterdir() if (entry / CONFIG_FILENAME).is_file()
+    )
+
+
 def save_twin_config(config: TwinConfigFile, data_dir: Path) -> Path:
     """Write a twin config as JSON under <data_dir>/twins/<name>/config.json."""
     directory = twin_dir(config.name, data_dir)
