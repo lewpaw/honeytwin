@@ -4,4 +4,34 @@
 
 max_payload_bytes: 65536
 exposure_scope: local
-docker_network_mode: macvlan
+
+# Bridge by default: host firewall rules cannot restrict macvlan traffic, so
+# a macvlan twin cannot be denied outbound access (verified - see Epic 5).
+# Selecting macvlan means also setting allow_outbound: true below, plus
+# macvlan_parent_interface and macvlan_subnet.
+docker_network_mode: bridge
+
+# --- Containment (Epic 5) ---
+# Whether twins may initiate outbound connections. Denied by default so an
+# abused twin cannot reach the real target, the host, or the internal
+# network. Enforced by host firewall rules that `honeytwin containment-setup`
+# installs (once, with sudo) for bridge_subnet below.
+#
+# Note: host firewall rules cannot restrict macvlan traffic, so a macvlan
+# twin must set allow_outbound: true or `honeytwin run` will refuse it.
+# Remote syslog forwarding is outbound traffic and also requires it.
+allow_outbound: false
+
+# Fixed subnets for HoneyTwin's bridge networks. Pinned rather than left to
+# Docker's IPAM because the egress restriction is a firewall rule that has
+# to name one. Twins that opt into outbound access go on the second subnet,
+# which the restriction deliberately does not cover.
+bridge_subnet: 172.31.240.0/24
+bridge_egress_subnet: 172.31.241.0/24
+
+# Resource ceilings for a twin's container, so a twin under load or abuse
+# cannot deny service to the host. A banner-replay listener needs very
+# little; raise these for unusually demanding twins.
+mem_limit: 256m
+pids_limit: 128
+cpu_quota: 50000 # microseconds per Docker's 100000us period, so half a CPU

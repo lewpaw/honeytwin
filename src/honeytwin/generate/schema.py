@@ -32,3 +32,7 @@ class TwinConfigFile(BaseModel):
     syslog_host: str | None = None
     syslog_port: int = 514
     syslog_protocol: SyslogProtocol = SyslogProtocol.UDP
+    allow_outbound: bool = False
+    mem_limit: str = "256m"
+    pids_limit: int = 128
+    cpu_quota: int = 50000

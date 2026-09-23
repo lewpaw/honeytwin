@@ -9,6 +9,7 @@ from honeytwin.docker.client import (
     TWIN_CONFIG_MOUNT_PATH,
     TWIN_LOG_MOUNT_PATH,
     DockerUnavailableError,
+    NetworkSubnetMismatchError,
     create_bridge_network,
     create_macvlan_network,
     create_twin_container,
@@ -42,27 +43,44 @@ def test_get_client_raises_when_ping_fails(monkeypatch):
         get_client()
 
 
-def test_create_bridge_network_creates_when_missing():
+def test_create_bridge_network_pins_the_requested_subnet():
     mock_client = MagicMock()
     mock_client.networks.get.side_effect = NotFound("no such network")
     created_network = MagicMock()
     mock_client.networks.create.return_value = created_network
 
-    result = create_bridge_network(mock_client, name="honeytwin-bridge")
+    result = create_bridge_network(mock_client, name="honeytwin-bridge", subnet="172.31.240.0/24")
 
-    mock_client.networks.create.assert_called_once_with("honeytwin-bridge", driver="bridge")
+    call = mock_client.networks.create.call_args
+    assert call.args[0] == "honeytwin-bridge"
+    assert call.kwargs["driver"] == "bridge"
+    pool = call.kwargs["ipam"]["Config"][0]
+    assert pool["Subnet"] == "172.31.240.0/24"
     assert result is created_network
 
 
-def test_create_bridge_network_reuses_existing():
+def test_create_bridge_network_reuses_existing_with_matching_subnet():
     mock_client = MagicMock()
     existing_network = MagicMock()
+    existing_network.attrs = {"IPAM": {"Config": [{"Subnet": "172.31.240.0/24"}]}}
     mock_client.networks.get.return_value = existing_network
 
-    result = create_bridge_network(mock_client, name="honeytwin-bridge")
+    result = create_bridge_network(mock_client, name="honeytwin-bridge", subnet="172.31.240.0/24")
 
     mock_client.networks.create.assert_not_called()
     assert result is existing_network
+
+
+def test_create_bridge_network_refuses_existing_network_on_a_different_subnet():
+    """The egress restriction is a firewall rule naming one subnet, so a twin
+    on any other subnet would sit outside it."""
+    mock_client = MagicMock()
+    existing_network = MagicMock()
+    existing_network.attrs = {"IPAM": {"Config": [{"Subnet": "172.20.0.0/16"}]}}
+    mock_client.networks.get.return_value = existing_network
+
+    with pytest.raises(NetworkSubnetMismatchError):
+        create_bridge_network(mock_client, name="honeytwin-bridge", subnet="172.31.240.0/24")
 
 
 def test_create_macvlan_network_creates_when_missing():
@@ -233,6 +251,72 @@ def test_create_twin_container_includes_log_mount():
         "bind": TWIN_LOG_MOUNT_PATH,
         "mode": "rw",
     }
+
+
+def test_create_twin_container_drops_all_capabilities_and_adds_back_net_bind_service():
+    mock_client = MagicMock()
+
+    create_twin_container(
+        mock_client,
+        name="web-01",
+        image="honeytwin-twin:local",
+        config_path=Path("/data/twins/web-01/config.json"),
+        log_dir=Path("/data/logs/web-01"),
+        ports=[22],
+        network_mode=DockerNetworkMode.BRIDGE,
+        network_name="honeytwin-bridge",
+        exposure_scope=ExposureScope.LOCAL,
+    )
+
+    call = mock_client.containers.create.call_args
+    assert call.kwargs["cap_drop"] == ["ALL"]
+    assert call.kwargs["cap_add"] == ["NET_BIND_SERVICE"]
+
+
+def test_create_twin_container_applies_resource_limits_and_read_only_rootfs():
+    mock_client = MagicMock()
+
+    create_twin_container(
+        mock_client,
+        name="web-01",
+        image="honeytwin-twin:local",
+        config_path=Path("/data/twins/web-01/config.json"),
+        log_dir=Path("/data/logs/web-01"),
+        ports=[22],
+        network_mode=DockerNetworkMode.BRIDGE,
+        network_name="honeytwin-bridge",
+        exposure_scope=ExposureScope.LOCAL,
+        mem_limit="64m",
+        pids_limit=32,
+        cpu_quota=25000,
+    )
+
+    call = mock_client.containers.create.call_args
+    assert call.kwargs["read_only"] is True
+    assert call.kwargs["mem_limit"] == "64m"
+    assert call.kwargs["pids_limit"] == 32
+    assert call.kwargs["cpu_quota"] == 25000
+
+
+def test_create_twin_container_applies_conservative_limit_defaults():
+    mock_client = MagicMock()
+
+    create_twin_container(
+        mock_client,
+        name="web-01",
+        image="honeytwin-twin:local",
+        config_path=Path("/data/twins/web-01/config.json"),
+        log_dir=Path("/data/logs/web-01"),
+        ports=[22],
+        network_mode=DockerNetworkMode.BRIDGE,
+        network_name="honeytwin-bridge",
+        exposure_scope=ExposureScope.LOCAL,
+    )
+
+    call = mock_client.containers.create.call_args
+    assert call.kwargs["mem_limit"] == "256m"
+    assert call.kwargs["pids_limit"] == 128
+    assert call.kwargs["cpu_quota"] == 50000
 
 
 def test_get_twin_container_status_returns_status_when_container_exists():

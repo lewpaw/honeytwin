@@ -17,6 +17,14 @@ INTERNET_EXPOSURE_WARNING = (
 )
 
 
+OUTBOUND_ACCESS_WARNING = (
+    "WARNING: this twin has allow_outbound enabled — it can initiate "
+    "connections to other hosts, including the real target and the internal "
+    "network. This weakens containment; enable it only when something like "
+    "remote syslog forwarding genuinely requires it."
+)
+
+
 def print_authorization_warning() -> None:
     """Print the non-blocking authorization reminder before a scan proceeds."""
     typer.echo(AUTHORIZATION_WARNING, err=True)
@@ -25,3 +33,8 @@ def print_authorization_warning() -> None:
 def print_internet_exposure_warning() -> None:
     """Print the non-blocking reminder before an internet-facing twin starts."""
     typer.echo(INTERNET_EXPOSURE_WARNING, err=True)
+
+
+def print_outbound_access_warning() -> None:
+    """Print the non-blocking reminder before a twin with egress enabled starts."""
+    typer.echo(OUTBOUND_ACCESS_WARNING, err=True)

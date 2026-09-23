@@ -15,7 +15,8 @@ def test_load_global_config_uses_shipped_defaults():
     cfg = load_global_config()
     assert cfg.max_payload_bytes == 65536
     assert cfg.exposure_scope is ExposureScope.LOCAL
-    assert cfg.docker_network_mode is DockerNetworkMode.MACVLAN
+    assert cfg.docker_network_mode is DockerNetworkMode.BRIDGE
+    assert cfg.allow_outbound is False
 
 
 def test_load_global_config_override_file(tmp_path: Path):

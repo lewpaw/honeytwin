@@ -49,12 +49,46 @@ def _discover_lan_bind_address() -> str:
         return "127.0.0.1"
 
 
-def create_bridge_network(client: docker.DockerClient, *, name: str) -> Network:
-    """Create a standard bridge network, or return the existing one with that name."""
+class NetworkSubnetMismatchError(Exception):
+    """Raised when an existing network's subnet is not the one asked for."""
+
+
+def _network_subnets(network: Network) -> list[str]:
+    """The subnets configured on a network, as CIDR strings."""
+    ipam = network.attrs.get("IPAM") or {}
+    return [c["Subnet"] for c in (ipam.get("Config") or []) if c.get("Subnet")]
+
+
+def create_bridge_network(client: docker.DockerClient, *, name: str, subnet: str) -> Network:
+    """Create a bridge network on a fixed subnet, or return the existing one.
+
+    The subnet is pinned rather than left to Docker's IPAM because the
+    host egress restriction is a firewall rule that has to name it (see
+    design.md). Egress is therefore a property of which network a twin
+    attaches to: the denied-egress subnet is covered by the rules, the
+    allowed-egress one deliberately is not, so twins with different
+    egress settings cannot share a network.
+
+    Reusing a network whose subnet differs from the one asked for would
+    put the twin outside the rules that were installed for it, so that
+    case raises rather than proceeding.
+    """
     try:
-        return client.networks.get(name)
+        network = client.networks.get(name)
     except NotFound:
-        return client.networks.create(name, driver="bridge")
+        ipam_pool = docker.types.IPAMPool(subnet=subnet)
+        ipam_config = docker.types.IPAMConfig(pool_configs=[ipam_pool])
+        return client.networks.create(name, driver="bridge", ipam=ipam_config)
+
+    existing = _network_subnets(network)
+    if subnet not in existing:
+        raise NetworkSubnetMismatchError(
+            f"Docker network {name!r} already exists on {existing or 'an unknown subnet'}, "
+            f"but {subnet} was required — the host egress restriction is installed for "
+            f"{subnet}, so a twin on any other subnet would not be covered by it. "
+            f"Remove it (docker network rm {name}) and retry."
+        )
+    return network
 
 
 def create_macvlan_network(
@@ -97,6 +131,9 @@ def create_twin_container(
     network_name: str,
     exposure_scope: ExposureScope,
     run_as_user: str | None = None,
+    mem_limit: str = "256m",
+    pids_limit: int = 128,
+    cpu_quota: int = 50000,
 ) -> Container:
     """Create (but do not start) a twin's container.
 
@@ -108,10 +145,19 @@ def create_twin_container(
     attacker records, and the container is granted `NET_BIND_SERVICE` so
     its non-root user can still bind privileged ports.
 
+    Containment (Epic 5): every other Linux capability is dropped — a
+    banner-replay listener has no use for `NET_RAW` and the rest of
+    Docker's default set; the root filesystem is read-only apart from
+    the mounted log directory; and memory, PID, and CPU limits bound
+    what a twin under abuse can take from the host. Egress denial is a
+    property of the network the twin attaches to, handled by the caller
+    via `create_bridge_network(internal=...)`.
+
     `run_as_user` ("uid:gid") overrides the image's built-in non-root
     user. On Linux this must be set to the host user owning `log_dir`,
     or the container can't write its logs there — the image's own uid
-    won't match the host's. It stays non-root either way.
+    won't match the host's. It stays non-root either way: `run` refuses
+    to start when the operator is root.
     """
     volumes = {
         str(config_path): {"bind": TWIN_CONFIG_MOUNT_PATH, "mode": "ro"},
@@ -135,7 +181,12 @@ def create_twin_container(
         network=network_name,
         ports=port_bindings,
         volumes=volumes,
+        cap_drop=["ALL"],
         cap_add=["NET_BIND_SERVICE"],
+        read_only=True,
+        mem_limit=mem_limit,
+        pids_limit=pids_limit,
+        cpu_quota=cpu_quota,
         **create_kwargs,
     )
 

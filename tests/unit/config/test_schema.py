@@ -14,7 +14,10 @@ def test_global_config_defaults():
     assert cfg.data_dir == Path.home() / ".honeytwin"
     assert cfg.max_payload_bytes == 65536
     assert cfg.exposure_scope is ExposureScope.LOCAL
-    assert cfg.docker_network_mode is DockerNetworkMode.MACVLAN
+    # Bridge, not macvlan: host firewall rules cannot restrict macvlan
+    # egress, so a macvlan twin cannot honor the default containment
+    # guarantee (Epic 5).
+    assert cfg.docker_network_mode is DockerNetworkMode.BRIDGE
     assert cfg.scan_timeout_seconds == 600
     assert cfg.syslog_enabled is False
     assert cfg.syslog_host is None
@@ -74,3 +77,35 @@ def test_twin_config_can_override():
     assert cfg.syslog_host == "syslog.example.com"
     assert cfg.syslog_port == 1514
     assert cfg.syslog_protocol is SyslogProtocol.TCP
+
+
+def test_global_config_containment_defaults():
+    cfg = GlobalConfig()
+    assert cfg.allow_outbound is False
+    assert cfg.mem_limit == "256m"
+    assert cfg.pids_limit == 128
+    assert cfg.cpu_quota == 50000
+
+
+def test_global_config_containment_settings_can_be_overridden():
+    cfg = GlobalConfig(allow_outbound=True, mem_limit="1g", pids_limit=512, cpu_quota=100000)
+    assert cfg.allow_outbound is True
+    assert cfg.mem_limit == "1g"
+    assert cfg.pids_limit == 512
+    assert cfg.cpu_quota == 100000
+
+
+def test_twin_config_containment_fields_optional():
+    cfg = TwinConfig()
+    assert cfg.allow_outbound is None
+    assert cfg.mem_limit is None
+    assert cfg.pids_limit is None
+    assert cfg.cpu_quota is None
+
+
+def test_twin_config_can_opt_out_of_egress_denial():
+    cfg = TwinConfig(allow_outbound=True, mem_limit="512m", pids_limit=64, cpu_quota=20000)
+    assert cfg.allow_outbound is True
+    assert cfg.mem_limit == "512m"
+    assert cfg.pids_limit == 64
+    assert cfg.cpu_quota == 20000

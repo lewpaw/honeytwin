@@ -32,4 +32,8 @@ def generate_twin_config(
         syslog_host=twin_settings.syslog_host,
         syslog_port=twin_settings.syslog_port,
         syslog_protocol=twin_settings.syslog_protocol,
+        allow_outbound=twin_settings.allow_outbound,
+        mem_limit=twin_settings.mem_limit,
+        pids_limit=twin_settings.pids_limit,
+        cpu_quota=twin_settings.cpu_quota,
     )

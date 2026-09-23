@@ -29,6 +29,9 @@ from honeytwin.profile.schema import PortInfo, ScanProfileName, TwinProfile
 from honeytwin.profile.store import save_profile
 
 TWIN_IMAGE = "honeytwin-twin:local"
+# Its own subnet, so these tests never collide with the subnets a real
+# install pins for contained and egress-allowed twins.
+TEST_BRIDGE_SUBNET = "172.31.242.0/24"
 
 
 def _free_port() -> int:
@@ -69,7 +72,7 @@ def test_generated_twin_replays_banner_and_holds_no_banner_port_open(tmp_path: P
     log_dir.mkdir(parents=True, exist_ok=True)
 
     client = get_client()
-    network = create_bridge_network(client, name="honeytwin-test-bridge")
+    network = create_bridge_network(client, name="honeytwin-test-bridge", subnet=TEST_BRIDGE_SUBNET)
 
     container_name = "honeytwin-test-integration-twin"
     try:
@@ -129,7 +132,7 @@ def test_local_scope_bridge_binds_to_discovered_lan_address(tmp_path: Path):
     log_dir.mkdir(parents=True, exist_ok=True)
 
     client = get_client()
-    network = create_bridge_network(client, name="honeytwin-test-bridge")
+    network = create_bridge_network(client, name="honeytwin-test-bridge", subnet=TEST_BRIDGE_SUBNET)
 
     container_name = "honeytwin-test-local-scope-twin"
     try:

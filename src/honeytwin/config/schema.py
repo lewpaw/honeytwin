@@ -51,8 +51,12 @@ class GlobalConfig(BaseModel):
         description="Default network exposure scope for twins that don't override it.",
     )
     docker_network_mode: DockerNetworkMode = Field(
-        default=DockerNetworkMode.MACVLAN,
-        description="Default Docker network mode for twins that don't override it.",
+        default=DockerNetworkMode.BRIDGE,
+        description=(
+            "Default Docker network mode for twins that don't override it. "
+            "Bridge is the default because host firewall rules cannot restrict "
+            "macvlan traffic, so a macvlan twin cannot be denied outbound access."
+        ),
     )
     scan_timeout_seconds: int = Field(
         default=600,
@@ -88,6 +92,47 @@ class GlobalConfig(BaseModel):
         default=SyslogProtocol.UDP,
         description="Transport used to send syslog messages.",
     )
+    allow_outbound: bool = Field(
+        default=False,
+        description=(
+            "Whether twins may initiate outbound network connections. Denied "
+            "by default so an abused twin cannot reach the real target, the "
+            "host, or the internal network. Enabling it weakens containment; "
+            "remote syslog forwarding requires it."
+        ),
+    )
+    bridge_subnet: str = Field(
+        default="172.31.240.0/24",
+        description=(
+            "Subnet (CIDR) for the bridge network used by egress-denied twins. "
+            "Fixed rather than IPAM-assigned so the host egress restriction can "
+            "name it; 'honeytwin containment-setup' installs rules for this subnet."
+        ),
+    )
+    bridge_egress_subnet: str = Field(
+        default="172.31.241.0/24",
+        description=(
+            "Subnet (CIDR) for the bridge network used by twins that opt into "
+            "outbound access. Deliberately not covered by the egress restriction."
+        ),
+    )
+    mem_limit: str = Field(
+        default="256m",
+        description="Memory limit for a twin's container, in Docker's format (e.g. 256m).",
+    )
+    pids_limit: int = Field(
+        default=128,
+        gt=0,
+        description="Maximum number of processes a twin's container may create.",
+    )
+    cpu_quota: int = Field(
+        default=50000,
+        gt=0,
+        description=(
+            "CPU quota in microseconds per Docker's default 100000us period, "
+            "so 50000 is half a CPU."
+        ),
+    )
 
 
 class TwinConfig(BaseModel):
@@ -104,3 +149,7 @@ class TwinConfig(BaseModel):
     syslog_host: str | None = None
     syslog_port: int | None = Field(default=None, gt=0)
     syslog_protocol: SyslogProtocol | None = None
+    allow_outbound: bool | None = None
+    mem_limit: str | None = None
+    pids_limit: int | None = Field(default=None, gt=0)
+    cpu_quota: int | None = Field(default=None, gt=0)

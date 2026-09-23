@@ -79,3 +79,37 @@ def test_generate_carries_logging_settings():
     assert config.syslog_host == "syslog.example.com"
     assert config.syslog_port == 1514
     assert config.syslog_protocol is SyslogProtocol.TCP
+
+
+def test_generate_carries_containment_settings():
+    profile = _profile_with_mixed_ports()
+    settings = GlobalConfig(allow_outbound=True, mem_limit="512m", pids_limit=64, cpu_quota=20000)
+
+    config = generate_twin_config(profile, "web-01", settings)
+
+    assert config.allow_outbound is True
+    assert config.mem_limit == "512m"
+    assert config.pids_limit == 64
+    assert config.cpu_quota == 20000
+
+
+def test_generate_denies_outbound_by_default():
+    profile = _profile_with_mixed_ports()
+
+    config = generate_twin_config(profile, "web-01", GlobalConfig())
+
+    assert config.allow_outbound is False
+    assert config.mem_limit == "256m"
+    assert config.pids_limit == 128
+    assert config.cpu_quota == 50000
+
+
+def test_generate_defaults_to_bridge_so_the_twin_can_be_contained():
+    """Macvlan traffic bypasses the host firewall, so a macvlan twin cannot
+    be denied outbound access - bridge is the default for that reason."""
+    profile = _profile_with_mixed_ports()
+
+    config = generate_twin_config(profile, "web-01", GlobalConfig())
+
+    assert config.docker_network_mode is DockerNetworkMode.BRIDGE
+    assert config.allow_outbound is False
