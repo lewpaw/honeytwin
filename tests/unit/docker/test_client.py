@@ -1,9 +1,12 @@
-from unittest.mock import MagicMock, patch
+from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
-from docker.errors import DockerException
+from docker.errors import DockerException, NotFound
 
+from honeytwin.config.schema import DockerNetworkMode, ExposureScope
 from honeytwin.docker.client import (
+    TWIN_CONFIG_MOUNT_PATH,
     DockerUnavailableError,
     create_bridge_network,
     create_macvlan_network,
@@ -15,51 +18,181 @@ from honeytwin.docker.client import (
 )
 
 
-def test_get_client_returns_client_and_pings():
+def test_get_client_returns_client_and_pings(monkeypatch):
     mock_client = MagicMock()
-    with patch("docker.from_env", return_value=mock_client) as mock_from_env:
-        client = get_client()
-    mock_from_env.assert_called_once()
+    monkeypatch.setattr("docker.from_env", lambda: mock_client)
+    client = get_client()
     mock_client.ping.assert_called_once()
     assert client is mock_client
 
 
-def test_get_client_raises_when_daemon_unreachable():
-    with patch("docker.from_env", side_effect=DockerException("no daemon")):
-        with pytest.raises(DockerUnavailableError):
-            get_client()
+def test_get_client_raises_when_daemon_unreachable(monkeypatch):
+    monkeypatch.setattr("docker.from_env", MagicMock(side_effect=DockerException("no daemon")))
+    with pytest.raises(DockerUnavailableError):
+        get_client()
 
 
-def test_get_client_raises_when_ping_fails():
+def test_get_client_raises_when_ping_fails(monkeypatch):
     mock_client = MagicMock()
     mock_client.ping.side_effect = DockerException("connection refused")
-    with patch("docker.from_env", return_value=mock_client):
-        with pytest.raises(DockerUnavailableError):
-            get_client()
+    monkeypatch.setattr("docker.from_env", lambda: mock_client)
+    with pytest.raises(DockerUnavailableError):
+        get_client()
 
 
-@pytest.mark.parametrize(
-    "func,kwargs",
-    [
-        (
-            create_twin_container,
-            {"name": "web-01", "image": "honeytwin/twin", "network_mode": "macvlan"},
-        ),
-        (start_twin_container, {"name": "web-01"}),
-        (stop_twin_container, {"name": "web-01"}),
-        (remove_twin_container, {"name": "web-01"}),
-    ],
-)
-def test_container_lifecycle_functions_are_stubs(func, kwargs):
-    with pytest.raises(NotImplementedError):
-        func(MagicMock(), **kwargs)
+def test_create_bridge_network_creates_when_missing():
+    mock_client = MagicMock()
+    mock_client.networks.get.side_effect = NotFound("no such network")
+    created_network = MagicMock()
+    mock_client.networks.create.return_value = created_network
+
+    result = create_bridge_network(mock_client, name="honeytwin-bridge")
+
+    mock_client.networks.create.assert_called_once_with("honeytwin-bridge", driver="bridge")
+    assert result is created_network
 
 
-def test_create_macvlan_network_is_stub():
-    with pytest.raises(NotImplementedError):
-        create_macvlan_network(MagicMock(), parent_interface="eth0", subnet="192.0.2.0/24")
+def test_create_bridge_network_reuses_existing():
+    mock_client = MagicMock()
+    existing_network = MagicMock()
+    mock_client.networks.get.return_value = existing_network
+
+    result = create_bridge_network(mock_client, name="honeytwin-bridge")
+
+    mock_client.networks.create.assert_not_called()
+    assert result is existing_network
 
 
-def test_create_bridge_network_is_stub():
-    with pytest.raises(NotImplementedError):
-        create_bridge_network(MagicMock(), name="honeytwin-bridge")
+def test_create_macvlan_network_creates_when_missing():
+    mock_client = MagicMock()
+    mock_client.networks.get.side_effect = NotFound("no such network")
+    created_network = MagicMock()
+    mock_client.networks.create.return_value = created_network
+
+    result = create_macvlan_network(
+        mock_client,
+        name="honeytwin-macvlan",
+        parent_interface="eth0",
+        subnet="192.168.1.0/24",
+        gateway="192.168.1.1",
+    )
+
+    assert mock_client.networks.create.call_count == 1
+    call = mock_client.networks.create.call_args
+    assert call.args[0] == "honeytwin-macvlan"
+    assert call.kwargs["driver"] == "macvlan"
+    assert call.kwargs["options"] == {"parent": "eth0"}
+    assert result is created_network
+
+
+def test_create_macvlan_network_reuses_existing():
+    mock_client = MagicMock()
+    existing_network = MagicMock()
+    mock_client.networks.get.return_value = existing_network
+
+    result = create_macvlan_network(
+        mock_client, name="honeytwin-macvlan", parent_interface="eth0", subnet="192.168.1.0/24"
+    )
+
+    mock_client.networks.create.assert_not_called()
+    assert result is existing_network
+
+
+def test_create_twin_container_bridge_mode_internet_binds_all_interfaces():
+    mock_client = MagicMock()
+
+    create_twin_container(
+        mock_client,
+        name="web-01",
+        image="honeytwin-twin:local",
+        config_path=Path("/data/twins/web-01/config.json"),
+        ports=[22, 80],
+        network_mode=DockerNetworkMode.BRIDGE,
+        network_name="honeytwin-bridge",
+        exposure_scope=ExposureScope.INTERNET,
+    )
+
+    call = mock_client.containers.create.call_args
+    assert call.args[0] == "honeytwin-twin:local"
+    assert call.kwargs["name"] == "web-01"
+    assert call.kwargs["network"] == "honeytwin-bridge"
+    assert call.kwargs["ports"] == {
+        "22/tcp": ("0.0.0.0", 22),
+        "80/tcp": ("0.0.0.0", 80),
+    }
+    assert call.kwargs["cap_add"] == ["NET_BIND_SERVICE"]
+    assert call.kwargs["volumes"] == {
+        str(Path("/data/twins/web-01/config.json")): {
+            "bind": TWIN_CONFIG_MOUNT_PATH,
+            "mode": "ro",
+        }
+    }
+
+
+def test_create_twin_container_bridge_mode_local_binds_discovered_address(monkeypatch):
+    mock_client = MagicMock()
+    monkeypatch.setattr("honeytwin.docker.client._discover_lan_bind_address", lambda: "10.0.0.5")
+
+    create_twin_container(
+        mock_client,
+        name="web-01",
+        image="honeytwin-twin:local",
+        config_path=Path("/data/twins/web-01/config.json"),
+        ports=[22],
+        network_mode=DockerNetworkMode.BRIDGE,
+        network_name="honeytwin-bridge",
+        exposure_scope=ExposureScope.LOCAL,
+    )
+
+    call = mock_client.containers.create.call_args
+    assert call.kwargs["ports"] == {"22/tcp": ("10.0.0.5", 22)}
+
+
+def test_create_twin_container_macvlan_mode_publishes_no_ports():
+    mock_client = MagicMock()
+
+    create_twin_container(
+        mock_client,
+        name="web-01",
+        image="honeytwin-twin:local",
+        config_path=Path("/data/twins/web-01/config.json"),
+        ports=[22, 80],
+        network_mode=DockerNetworkMode.MACVLAN,
+        network_name="honeytwin-macvlan",
+        exposure_scope=ExposureScope.LOCAL,
+    )
+
+    call = mock_client.containers.create.call_args
+    assert call.kwargs["ports"] is None
+    assert call.kwargs["network"] == "honeytwin-macvlan"
+
+
+def test_start_twin_container_calls_start():
+    mock_client = MagicMock()
+    mock_container = MagicMock()
+    mock_client.containers.get.return_value = mock_container
+
+    start_twin_container(mock_client, name="web-01")
+
+    mock_client.containers.get.assert_called_once_with("web-01")
+    mock_container.start.assert_called_once()
+
+
+def test_stop_twin_container_calls_stop():
+    mock_client = MagicMock()
+    mock_container = MagicMock()
+    mock_client.containers.get.return_value = mock_container
+
+    stop_twin_container(mock_client, name="web-01")
+
+    mock_container.stop.assert_called_once()
+
+
+def test_remove_twin_container_calls_remove_force():
+    mock_client = MagicMock()
+    mock_container = MagicMock()
+    mock_client.containers.get.return_value = mock_container
+
+    remove_twin_container(mock_client, name="web-01")
+
+    mock_container.remove.assert_called_once_with(force=True)

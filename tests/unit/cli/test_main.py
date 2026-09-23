@@ -1,7 +1,11 @@
+from pathlib import Path
+from unittest.mock import patch
+
 import pytest
 from typer.testing import CliRunner
 
 from honeytwin.cli.main import app
+from honeytwin.config.schema import GlobalConfig
 
 runner = CliRunner()
 
@@ -26,16 +30,17 @@ def test_scan_with_no_target_and_no_import_exits_nonzero():
     assert "provide a target or --import" in result.output
 
 
-def test_generate_stub_exits_nonzero_with_message():
+def test_generate_without_required_options_exits_nonzero():
     result = runner.invoke(app, ["generate"])
     assert result.exit_code != 0
-    assert "not yet implemented" in result.output
 
 
-def test_run_stub_requires_name_and_exits_nonzero():
-    result = runner.invoke(app, ["run", "--name", "web-01"])
+def test_run_with_no_generated_twin_config_exits_nonzero(tmp_path: Path):
+    settings = GlobalConfig(data_dir=tmp_path)
+    with patch("honeytwin.cli.commands.run.load_global_config", return_value=settings):
+        result = runner.invoke(app, ["run", "--name", "does-not-exist-anywhere"])
     assert result.exit_code != 0
-    assert "not yet implemented" in result.output
+    assert "No generated config found" in result.output
 
 
 def test_stop_stub_requires_name_and_exits_nonzero():

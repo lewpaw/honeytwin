@@ -1,16 +1,20 @@
 """Thin wrapper around the docker-py SDK for twin container lifecycle and
 networking.
-
-Only client construction and daemon-reachability checking are implemented
-in this change. Container lifecycle and macvlan/bridge network creation
-are Epic 2's responsibility (docs/ROADMAP.md); the signatures below exist
-so that code can be written against them now.
 """
 
 from __future__ import annotations
 
+import socket
+from pathlib import Path
+
 import docker
-from docker.errors import DockerException
+from docker.errors import DockerException, NotFound
+from docker.models.containers import Container
+from docker.models.networks import Network
+
+from honeytwin.config.schema import DockerNetworkMode, ExposureScope
+
+TWIN_CONFIG_MOUNT_PATH = "/etc/honeytwin/twin.json"
 
 
 class DockerUnavailableError(Exception):
@@ -27,42 +31,111 @@ def get_client() -> docker.DockerClient:
     return client
 
 
-def create_twin_container(
-    client: docker.DockerClient, *, name: str, image: str, network_mode: str
-) -> None:
-    """Create a twin's container. Full implementation is Epic 2's job."""
-    raise NotImplementedError("twin container creation is implemented in Epic 2 (docs/ROADMAP.md)")
+def _discover_lan_bind_address() -> str:
+    """Best-effort discovery of a non-loopback host IP for local-scope binding.
+
+    Not a hard security boundary — see design.md's exposure-scope decision:
+    true "LAN but not internet" isolation ultimately depends on the host's
+    network topology/firewalling, which HoneyTwin doesn't control. This is
+    a best-effort default, falling back to 127.0.0.1 (host-only) if
+    discovery fails.
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
 
 
-def start_twin_container(client: docker.DockerClient, *, name: str) -> None:
-    """Start a twin's container. Full implementation is Epic 2's job."""
-    raise NotImplementedError("twin container start is implemented in Epic 2 (docs/ROADMAP.md)")
-
-
-def stop_twin_container(client: docker.DockerClient, *, name: str) -> None:
-    """Stop a twin's container. Full implementation is Epic 4's job."""
-    raise NotImplementedError("twin container stop is implemented in Epic 4 (docs/ROADMAP.md)")
-
-
-def remove_twin_container(client: docker.DockerClient, *, name: str) -> None:
-    """Remove a twin's container. Full implementation is Epic 4's job."""
-    raise NotImplementedError("twin container removal is implemented in Epic 4 (docs/ROADMAP.md)")
+def create_bridge_network(client: docker.DockerClient, *, name: str) -> Network:
+    """Create a standard bridge network, or return the existing one with that name."""
+    try:
+        return client.networks.get(name)
+    except NotFound:
+        return client.networks.create(name, driver="bridge")
 
 
 def create_macvlan_network(
-    client: docker.DockerClient, *, parent_interface: str, subnet: str
-) -> None:
+    client: docker.DockerClient,
+    *,
+    name: str,
+    parent_interface: str,
+    subnet: str,
+    gateway: str | None = None,
+) -> Network:
     """Create a macvlan network so a twin gets its own LAN-visible IP/MAC.
 
-    Full implementation is Epic 2's job (docs/PRD.md section 9: macvlan is
-    the default Docker network mode for LAN-facing twins).
+    Real-world reachability needs verification on a native Linux host —
+    cloud VM virtual networking (and Docker Desktop's WSL2 backend) may
+    block macvlan's new-MAC-address traffic even where this call succeeds
+    (see design.md's acknowledged gap).
     """
-    raise NotImplementedError("macvlan network setup is implemented in Epic 2 (docs/ROADMAP.md)")
+    try:
+        return client.networks.get(name)
+    except NotFound:
+        ipam_pool = docker.types.IPAMPool(subnet=subnet, gateway=gateway)
+        ipam_config = docker.types.IPAMConfig(pool_configs=[ipam_pool])
+        return client.networks.create(
+            name,
+            driver="macvlan",
+            options={"parent": parent_interface},
+            ipam=ipam_config,
+        )
 
 
-def create_bridge_network(client: docker.DockerClient, *, name: str) -> None:
-    """Create a standard bridge network (the opt-out from macvlan).
+def create_twin_container(
+    client: docker.DockerClient,
+    *,
+    name: str,
+    image: str,
+    config_path: Path,
+    ports: list[int],
+    network_mode: DockerNetworkMode,
+    network_name: str,
+    exposure_scope: ExposureScope,
+) -> Container:
+    """Create (but do not start) a twin's container.
 
-    Full implementation is Epic 2's job.
+    Bridge mode publishes the twin's ports on the host (bound per
+    `exposure_scope`); macvlan mode needs no port publishing since the
+    container has its own directly-reachable LAN IP. Either way, the
+    twin's generated config is bind-mounted read-only, and the container
+    is granted `NET_BIND_SERVICE` so its non-root user (set by the image)
+    can still bind privileged ports.
     """
-    raise NotImplementedError("bridge network setup is implemented in Epic 2 (docs/ROADMAP.md)")
+    volumes = {str(config_path): {"bind": TWIN_CONFIG_MOUNT_PATH, "mode": "ro"}}
+
+    port_bindings = None
+    if network_mode is DockerNetworkMode.BRIDGE:
+        bind_host = (
+            "0.0.0.0" if exposure_scope is ExposureScope.INTERNET else _discover_lan_bind_address()
+        )
+        port_bindings = {f"{p}/tcp": (bind_host, p) for p in ports}
+
+    return client.containers.create(
+        image,
+        name=name,
+        network=network_name,
+        ports=port_bindings,
+        volumes=volumes,
+        cap_add=["NET_BIND_SERVICE"],
+    )
+
+
+def start_twin_container(client: docker.DockerClient, *, name: str) -> None:
+    """Start a twin's already-created container."""
+    container = client.containers.get(name)
+    container.start()
+
+
+def stop_twin_container(client: docker.DockerClient, *, name: str) -> None:
+    """Stop a twin's running container."""
+    container = client.containers.get(name)
+    container.stop()
+
+
+def remove_twin_container(client: docker.DockerClient, *, name: str) -> None:
+    """Remove a twin's container."""
+    container = client.containers.get(name)
+    container.remove(force=True)

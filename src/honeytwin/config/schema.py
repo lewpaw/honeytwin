@@ -52,6 +52,18 @@ class GlobalConfig(BaseModel):
         gt=0,
         description="Maximum time to wait for an nmap scan to complete.",
     )
+    macvlan_parent_interface: str | None = Field(
+        default=None,
+        description="Host network interface a macvlan-mode twin attaches to.",
+    )
+    macvlan_subnet: str | None = Field(
+        default=None,
+        description="Subnet (CIDR) for the macvlan network, e.g. 192.168.1.0/24.",
+    )
+    macvlan_gateway: str | None = Field(
+        default=None,
+        description="Gateway IP for the macvlan network.",
+    )
 
 
 class TwinConfig(BaseModel):
@@ -61,3 +73,6 @@ class TwinConfig(BaseModel):
     exposure_scope: ExposureScope | None = None
     docker_network_mode: DockerNetworkMode | None = None
     scan_timeout_seconds: int | None = Field(default=None, gt=0)
+    macvlan_parent_interface: str | None = None
+    macvlan_subnet: str | None = None
+    macvlan_gateway: str | None = None
